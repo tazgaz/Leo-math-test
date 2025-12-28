@@ -1,39 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
 import { Exercise, LevelType } from '../types';
 import { ALL_EXERCISES } from '../exerciseData';
-
-// Helper for decoding base64 to bytes
-function decodeBase64(base64: string) {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
-
-// Helper for decoding raw PCM data
-async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
-): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
-  }
-  return buffer;
-}
 
 interface ExerciseScreenProps {
   levelId: LevelType;
@@ -55,7 +22,7 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
     const pool = ALL_EXERCISES[levelId] || [];
     const shuffled = [...pool].sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, 10);
-    
+
     setExercises(selected);
     setLoading(false);
 
@@ -105,44 +72,34 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
     }
   };
 
-  const speakText = async (text: string) => {
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' }, 
-            },
-          },
-        },
-      });
+  const speakText = (text: string) => {
+    return new Promise<void>((resolve) => {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
 
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        const ctx = initAudio();
-        const audioBuffer = await decodeAudioData(decodeBase64(base64Audio), ctx, 24000, 1);
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(ctx.destination);
-        source.start();
-        return new Promise<void>((resolve) => {
-          source.onended = () => resolve();
-        });
-      }
-    } catch (error) {
-      console.error("TTS Error:", error);
-    }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'he-IL';
+      utterance.rate = 0.9;
+      utterance.pitch = 1.1; // Friendly tone for kids
+
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        resolve();
+      };
+
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        resolve();
+      };
+
+      setIsSpeaking(true);
+      window.speechSynthesis.speak(utterance);
+    });
   };
 
   const speakQuestion = async (text: string) => {
     if (isSpeaking) return;
-    setIsSpeaking(true);
-    await speakText(`קרא בקול ברור לילד: ${text}`);
-    setIsSpeaking(false);
+    await speakText(text);
   };
 
   const handleAnswer = async (ans: string) => {
@@ -151,9 +108,9 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
     const current = exercises[currentIndex];
     const normalizedUserAns = ans.trim();
     const normalizedCorrectAns = current.answer.toString().trim();
-    
+
     const isCorrect = normalizedUserAns === normalizedCorrectAns;
-    
+
     setShowFeedback(isCorrect ? 'correct' : 'wrong');
     playSoundEffect(isCorrect ? 'success' : 'error');
 
@@ -187,10 +144,9 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
   const current = exercises[currentIndex];
 
   return (
-    <div className={`max-w-xl mx-auto p-4 bg-white rounded-2xl shadow-xl relative overflow-hidden min-h-[400px] transition-all duration-500 ${
-      showFeedback === 'correct' ? 'ring-[30px] ring-green-400/60 shadow-[0_0_150px_rgba(34,197,94,1)]' : 
-      showFeedback === 'wrong' ? 'ring-[30px] ring-red-500/60 shadow-[0_0_150px_rgba(239,68,68,1)] animate-shake' : ''
-    }`}>
+    <div className={`max-w-xl mx-auto p-4 bg-white rounded-2xl shadow-xl relative overflow-hidden min-h-[400px] transition-all duration-500 ${showFeedback === 'correct' ? 'ring-[30px] ring-green-400/60 shadow-[0_0_150px_rgba(34,197,94,1)]' :
+        showFeedback === 'wrong' ? 'ring-[30px] ring-red-500/60 shadow-[0_0_150px_rgba(239,68,68,1)] animate-shake' : ''
+      }`}>
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -225,13 +181,13 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
           </div>
         </div>
       )}
-      
+
       {showFeedback === 'wrong' && (
         <div className="absolute inset-0 bg-gradient-to-br from-red-600 via-red-700 to-rose-900 flex flex-col items-center justify-center z-50 animate-in fade-in zoom-in duration-300">
           <span className="text-[140px] mb-2 shadow-fail-icon">💥</span>
           <h2 className="text-6xl font-black text-white mb-6 text-center px-4 text-shadow-red">נסה שוב!</h2>
           <div className="bg-white text-red-700 px-10 py-5 rounded-[2.5rem] text-4xl font-black shadow-[0_20px_50px_rgba(0,0,0,0.4)] border-4 border-red-200 transform hover:scale-105 transition-transform">
-             {current.answer}
+            {current.answer}
           </div>
           <p className="text-red-100 mt-8 text-2xl font-bold opacity-80">לא מוותרים, ליאו איתך!</p>
         </div>
@@ -240,17 +196,17 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <button onClick={onBack} className="text-gray-400 hover:text-red-500 text-sm font-bold transition-colors">✖️ יציאה</button>
         <div className="flex flex-col items-center">
-            <div className="w-40 h-3 bg-gray-100 rounded-full overflow-hidden shadow-inner border border-gray-200">
-                <div 
-                    className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" 
-                    style={{ width: `${((currentIndex + 1) / exercises.length) * 100}%` }}
-                ></div>
-            </div>
-            <span className="text-[12px] text-blue-500 mt-1 font-black">{currentIndex + 1} / {exercises.length}</span>
+          <div className="w-40 h-3 bg-gray-100 rounded-full overflow-hidden shadow-inner border border-gray-200">
+            <div
+              className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+              style={{ width: `${((currentIndex + 1) / exercises.length) * 100}%` }}
+            ></div>
+          </div>
+          <span className="text-[12px] text-blue-500 mt-1 font-black">{currentIndex + 1} / {exercises.length}</span>
         </div>
         <div className="flex items-center bg-yellow-50 px-3 py-1.5 rounded-xl border-2 border-yellow-200 shadow-sm">
-            <span className="text-sm mr-1">🪙</span>
-            <span className="text-sm font-black text-yellow-700">{score}</span>
+          <span className="text-sm mr-1">🪙</span>
+          <span className="text-sm font-black text-yellow-700">{score}</span>
         </div>
       </div>
 
@@ -259,17 +215,16 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
           <h2 className="text-3xl font-black text-blue-900 leading-tight min-h-[80px] flex items-center justify-center px-2 drop-shadow-sm">
             {current.question}
           </h2>
-          <button 
+          <button
             onClick={() => speakQuestion(current.question)}
             disabled={isSpeaking || !!showFeedback}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black text-sm transition-all shadow-md border-b-4 ${
-              isSpeaking ? 'bg-blue-100 text-blue-400 border-blue-200 translate-y-1' : 'bg-white text-blue-600 hover:bg-blue-50 border-blue-100 active:translate-y-1'
-            }`}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black text-sm transition-all shadow-md border-b-4 ${isSpeaking ? 'bg-blue-100 text-blue-400 border-blue-200 translate-y-1' : 'bg-white text-blue-600 hover:bg-blue-50 border-blue-100 active:translate-y-1'
+              }`}
           >
             {isSpeaking ? '🔊 מקשיבים...' : '🔈 הקרא לי'}
           </button>
         </div>
-        
+
         {current.type === 'multiple-choice' && current.options && (
           <div className="grid grid-cols-2 gap-4">
             {current.options.map((opt, idx) => (
