@@ -190,10 +190,14 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
         </div>
 
         {current.type === 'multiple-choice' && current.options && (
-          <div className="grid grid-cols-2 gap-4">
+          <div
+            className="grid grid-cols-2 gap-4"
+            style={{ direction: /^[0-9\s\+\-\*\/\=\?_]+$/.test(current.question) ? 'ltr' : 'inherit' }}
+          >
             {current.options.map((opt, idx) => (
               <button
                 key={idx}
+                dir="ltr"
                 disabled={!!showFeedback}
                 onClick={() => handleAnswer(opt.toString())}
                 className={`
