@@ -13,7 +13,6 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
   const [currentIndex, setCurrentIndex] = useState(0);
   const [inputAnswer, setInputAnswer] = useState('');
   const [loading, setLoading] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [score, setScore] = useState(0);
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -72,39 +71,6 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
     }
   };
 
-  const speakText = (text: string) => {
-    return new Promise<void>((resolve) => {
-      // Using Google Translate TTS (unofficial but reliable free service for Hebrew)
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=he&client=tw-ob`;
-
-      const audio = new Audio(url);
-
-      const handleEnd = () => {
-        setIsSpeaking(false);
-        resolve();
-      };
-
-      audio.onended = handleEnd;
-      audio.onerror = (e) => {
-        console.error("Audio playback error:", e);
-        setIsSpeaking(false);
-        resolve();
-      };
-
-      setIsSpeaking(true);
-      audio.play().catch(err => {
-        console.error("Playback was blocked or failed:", err);
-        setIsSpeaking(false);
-        resolve();
-      });
-    });
-  };
-
-  const speakQuestion = async (text: string) => {
-    if (isSpeaking) return;
-    await speakText(text);
-  };
-
   const handleAnswer = async (ans: string) => {
     if (showFeedback) return;
 
@@ -119,9 +85,6 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
 
     if (isCorrect) {
       setScore(prev => prev + 10);
-      speakText("נהדר! כל הכבוד!");
-    } else {
-      speakText(`אוי, לא נורא. התשובה הנכונה היא ${current.answer}`);
     }
 
     setTimeout(() => {
@@ -218,14 +181,6 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
           <h2 className="text-3xl font-black text-blue-900 leading-tight min-h-[80px] flex items-center justify-center px-2 drop-shadow-sm">
             {current.question}
           </h2>
-          <button
-            onClick={() => speakQuestion(current.question)}
-            disabled={isSpeaking || !!showFeedback}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black text-sm transition-all shadow-md border-b-4 ${isSpeaking ? 'bg-blue-100 text-blue-400 border-blue-200 translate-y-1' : 'bg-white text-blue-600 hover:bg-blue-50 border-blue-100 active:translate-y-1'
-              }`}
-          >
-            {isSpeaking ? '🔊 מקשיבים...' : '🔈 הקרא לי'}
-          </button>
         </div>
 
         {current.type === 'multiple-choice' && current.options && (
