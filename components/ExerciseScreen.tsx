@@ -72,53 +72,33 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
     }
   };
 
-  const getHebrewVoice = () => {
-    const voices = window.speechSynthesis.getVoices();
-    // Try to find a Hebrew voice
-    return voices.find(voice => voice.lang.includes('he') || voice.lang.includes('IL')) ||
-      voices.find(voice => voice.default && voice.lang.includes('he'));
-  };
-
   const speakText = (text: string) => {
     return new Promise<void>((resolve) => {
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
+      // Using Google Translate TTS (unofficial but reliable free service for Hebrew)
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=he&client=tw-ob`;
 
-      const utterance = new SpeechSynthesisUtterance(text);
+      const audio = new Audio(url);
 
-      // Attempt to find the best voice
-      const hebVoice = getHebrewVoice();
-      if (hebVoice) {
-        utterance.voice = hebVoice;
-      }
-
-      utterance.lang = 'he-IL';
-      utterance.rate = 0.85; // Slightly slower for clarity
-      utterance.pitch = 1.0;
-
-      utterance.onend = () => {
+      const handleEnd = () => {
         setIsSpeaking(false);
         resolve();
       };
 
-      utterance.onerror = (event) => {
-        console.error("Speech Error:", event);
+      audio.onended = handleEnd;
+      audio.onerror = (e) => {
+        console.error("Audio playback error:", e);
         setIsSpeaking(false);
         resolve();
       };
 
       setIsSpeaking(true);
-      window.speechSynthesis.speak(utterance);
+      audio.play().catch(err => {
+        console.error("Playback was blocked or failed:", err);
+        setIsSpeaking(false);
+        resolve();
+      });
     });
   };
-
-  // Pre-fetch voices to ensure they are available
-  useEffect(() => {
-    window.speechSynthesis.getVoices();
-    const handleVoicesChanged = () => window.speechSynthesis.getVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
-  }, []);
 
   const speakQuestion = async (text: string) => {
     if (isSpeaking) return;
