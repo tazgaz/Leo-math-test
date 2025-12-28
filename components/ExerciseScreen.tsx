@@ -72,22 +72,37 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
     }
   };
 
+  const getHebrewVoice = () => {
+    const voices = window.speechSynthesis.getVoices();
+    // Try to find a Hebrew voice
+    return voices.find(voice => voice.lang.includes('he') || voice.lang.includes('IL')) ||
+      voices.find(voice => voice.default && voice.lang.includes('he'));
+  };
+
   const speakText = (text: string) => {
     return new Promise<void>((resolve) => {
       // Cancel any ongoing speech
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
+
+      // Attempt to find the best voice
+      const hebVoice = getHebrewVoice();
+      if (hebVoice) {
+        utterance.voice = hebVoice;
+      }
+
       utterance.lang = 'he-IL';
-      utterance.rate = 0.9;
-      utterance.pitch = 1.1; // Friendly tone for kids
+      utterance.rate = 0.85; // Slightly slower for clarity
+      utterance.pitch = 1.0;
 
       utterance.onend = () => {
         setIsSpeaking(false);
         resolve();
       };
 
-      utterance.onerror = () => {
+      utterance.onerror = (event) => {
+        console.error("Speech Error:", event);
         setIsSpeaking(false);
         resolve();
       };
@@ -96,6 +111,14 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
       window.speechSynthesis.speak(utterance);
     });
   };
+
+  // Pre-fetch voices to ensure they are available
+  useEffect(() => {
+    window.speechSynthesis.getVoices();
+    const handleVoicesChanged = () => window.speechSynthesis.getVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+  }, []);
 
   const speakQuestion = async (text: string) => {
     if (isSpeaking) return;
@@ -145,7 +168,7 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
 
   return (
     <div className={`max-w-xl mx-auto p-4 bg-white rounded-2xl shadow-xl relative overflow-hidden min-h-[400px] transition-all duration-500 ${showFeedback === 'correct' ? 'ring-[30px] ring-green-400/60 shadow-[0_0_150px_rgba(34,197,94,1)]' :
-        showFeedback === 'wrong' ? 'ring-[30px] ring-red-500/60 shadow-[0_0_150px_rgba(239,68,68,1)] animate-shake' : ''
+      showFeedback === 'wrong' ? 'ring-[30px] ring-red-500/60 shadow-[0_0_150px_rgba(239,68,68,1)] animate-shake' : ''
       }`}>
       <style>{`
         @keyframes shake {
