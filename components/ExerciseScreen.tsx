@@ -152,7 +152,10 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
         <div className="absolute inset-0 bg-gradient-to-br from-red-600 via-red-700 to-rose-900 flex flex-col items-center justify-center z-50 animate-in fade-in zoom-in duration-300">
           <span className="text-[140px] mb-2 shadow-fail-icon">💥</span>
           <h2 className="text-6xl font-black text-white mb-6 text-center px-4 text-shadow-red">נסה שוב!</h2>
-          <div className="bg-white text-red-700 px-10 py-5 rounded-[2.5rem] text-4xl font-black shadow-[0_20px_50px_rgba(0,0,0,0.4)] border-4 border-red-200 transform hover:scale-105 transition-transform">
+          <div
+            dir="ltr"
+            className="bg-white text-red-700 px-10 py-5 rounded-[2.5rem] text-4xl font-black shadow-[0_20px_50px_rgba(0,0,0,0.4)] border-4 border-red-200 transform hover:scale-105 transition-transform"
+          >
             {current.answer}
           </div>
           <p className="text-red-100 mt-8 text-2xl font-bold opacity-80">לא מוותרים, ליאו איתך!</p>
@@ -178,7 +181,10 @@ const ExerciseScreen: React.FC<ExerciseScreenProps> = ({ levelId, onComplete, on
 
       <div className="text-center py-2">
         <div className="flex flex-col items-center gap-4 mb-6">
-          <h2 className="text-3xl font-black text-blue-900 leading-tight min-h-[80px] flex items-center justify-center px-2 drop-shadow-sm">
+          <h2
+            className="text-3xl font-black text-blue-900 leading-tight min-h-[80px] flex items-center justify-center px-2 drop-shadow-sm"
+            style={{ direction: /^[0-9\s\+\-\*\/\=\?_]+$/.test(current.question) ? 'ltr' : 'inherit' }}
+          >
             {current.question}
           </h2>
         </div>
